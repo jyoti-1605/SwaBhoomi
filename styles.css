@@ -44,9 +44,22 @@ body {
     align-items: center;
 }
 
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.logo-img {
+    height: 80px;
+    width: auto;
+    object-fit: contain;
+}
+
 .logo h1 {
     font-size: 1.8rem;
     color: var(--primary-color);
+    margin: 0;
 }
 
 .hindi {

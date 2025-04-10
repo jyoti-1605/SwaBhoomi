@@ -43,16 +43,19 @@ def init_db():
         cursor.execute("CREATE DATABASE IF NOT EXISTS swabhoomi")
         cursor.execute("USE swabhoomi")
         
-        # Create tables
+        # Create users table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
                 email VARCHAR(100) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL
+                password VARCHAR(255) NOT NULL,
+                did VARCHAR(255) UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
+        # Create addresses table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS addresses (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -63,6 +66,32 @@ def init_db():
                 state VARCHAR(100) NOT NULL,
                 postal_code VARCHAR(20) NOT NULL,
                 country VARCHAR(100) NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
+        # Create properties table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS properties (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                location VARCHAR(255) NOT NULL,
+                area DECIMAL(10,2) NOT NULL,
+                status ENUM('pending', 'verified', 'rejected') DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
+        # Create verifiable_credentials table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS verifiable_credentials (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                type VARCHAR(100) NOT NULL,
+                credential_data JSON NOT NULL,
+                status ENUM('active', 'revoked') DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
@@ -80,15 +109,17 @@ def init_db():
 init_db()
 
 class RegisterForm(FlaskForm):
-    name=StringField("Name", validators=[DataRequired()])
-    email=StringField("Email", validators=[DataRequired(), Email()])
-    password=PasswordField("Password", validators=[DataRequired()])
-    address=TextAreaField("Address", validators=[DataRequired()])
-    city=StringField("City", validators=[DataRequired()])
-    state=StringField("State", validators=[DataRequired()])
-    postal_code=StringField("Postal Code", validators=[DataRequired()])
-    country=StringField("Country", validators=[DataRequired()])
-    submit=SubmitField("Register")
+    first_name = StringField("First Name", validators=[DataRequired()])
+    last_name = StringField("Last Name", validators=[DataRequired()])
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    password = PasswordField("Password", validators=[DataRequired()])
+    confirm_password = PasswordField("Confirm Password", validators=[DataRequired()])
+    street = TextAreaField("Street Address", validators=[DataRequired()])
+    city = StringField("City", validators=[DataRequired()])
+    state = StringField("State", validators=[DataRequired()])
+    country = StringField("Country", validators=[DataRequired()])
+    pincode = StringField("Pincode", validators=[DataRequired()])
+    submit = SubmitField("Register")
 
     def validate_email(self, field):
         try:
@@ -126,14 +157,20 @@ def register():
 
             cursor = conn.cursor()
 
-            name = form.name.data
+            # Check if passwords match
+            if form.password.data != form.confirm_password.data:
+                flash('Passwords do not match.', 'error')
+                return render_template('register.html', form=form)
+
+            first_name = form.first_name.data
+            last_name = form.last_name.data
             email = form.email.data
             password = form.password.data
-            address = form.address.data
+            street = form.street.data
             city = form.city.data
             state = form.state.data
-            postal_code = form.postal_code.data
             country = form.country.data
+            pincode = form.pincode.data
 
             # Check if email already exists
             cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
@@ -148,8 +185,10 @@ def register():
             hash_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
             # Store user data
-            cursor.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)", 
-                         (name, email, hash_password))
+            cursor.execute("""
+                INSERT INTO users (name, email, password) 
+                VALUES (%s, %s, %s)
+            """, (f"{first_name} {last_name}", email, hash_password))
             conn.commit()
             user_id = cursor.lastrowid
 
@@ -157,7 +196,7 @@ def register():
             cursor.execute("""
                 INSERT INTO addresses (user_id, address_type, street_address, city, state, postal_code, country) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (user_id, 'PRIMARY', address, city, state, postal_code, country))
+            """, (user_id, 'PRIMARY', street, city, state, pincode, country))
             conn.commit()
             
             cursor.close()
@@ -227,24 +266,58 @@ def dashboard():
             return redirect('/login')
 
         user_id = session.get('user_id')
+        cursor = conn.cursor()
         
         # Get user data
-        cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE id=%s", (user_id,))
         user = cursor.fetchone()
         
-        # Get user addresses
-        cursor.execute("SELECT * FROM addresses WHERE user_id=%s", (user_id,))
-        addresses = cursor.fetchall()
+        if not user:
+            session.pop('user_id', None)
+            flash('User not found. Please login again.')
+            return redirect('/login')
+        
+        # Get property counts
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) as verified,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected
+            FROM properties 
+            WHERE user_id = %s
+        """, (user_id,))
+        counts = cursor.fetchone()
+        
+        # Get recent properties
+        cursor.execute("""
+            SELECT * FROM properties 
+            WHERE user_id = %s 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        """, (user_id,))
+        recent_properties = cursor.fetchall()
+        
+        # Get verifiable credentials
+        cursor.execute("""
+            SELECT * FROM verifiable_credentials 
+            WHERE user_id = %s AND status = 'active'
+        """, (user_id,))
+        verifiable_credentials = cursor.fetchall()
+        
         cursor.close()
         conn.close()
 
-        if user:   
-            return render_template('dashboard.html', user=user, addresses=addresses)
+        return render_template('dashboard.html',
+            current_user=user,
+            land_count=counts['total'] or 0,
+            verified_count=counts['verified'] or 0,
+            pending_count=counts['pending'] or 0,
+            issues_count=counts['rejected'] or 0,
+            recent_properties=recent_properties,
+            verifiable_credentials=verifiable_credentials
+        )
         
-        session.pop('user_id', None)
-        flash('User not found. Please login again.')
-        return redirect('/login')
     except Exception as e:
         print(f"Dashboard error: {e}")
         flash('An error occurred. Please try again.')
@@ -286,11 +359,73 @@ def profile():
         flash('An error occurred. Please try again.')
         return redirect('/login')
 
+@app.route('/digital-identity')
+def digital_identity():
+    if 'user_id' not in session:
+        flash('Please login first.')
+        return redirect('/login')
+    return render_template('digital_identity.html')
+
+@app.route('/land-registry')
+def land_registry():
+    if 'user_id' not in session:
+        flash('Please login first.')
+        return redirect('/login')
+    return render_template('land_registry.html')
+
+@app.route('/transactions')
+def transactions():
+    if 'user_id' not in session:
+        flash('Please login first.')
+        return redirect('/login')
+    return render_template('transactions.html')
+
+@app.route('/documents')
+def documents():
+    if 'user_id' not in session:
+        flash('Please login first.')
+        return redirect('/login')
+    return render_template('documents.html')
+
+@app.route('/settings')
+def settings():
+    if 'user_id' not in session:
+        flash('Please login first.')
+        return redirect('/login')
+    return render_template('settings.html')
+
 @app.route('/logout')
 def logout():
-    session.pop('user_id', None)
-    flash('You have been logged out')
-    return redirect('/login')
+    session.clear()  # Clear all session data
+    flash('You have been successfully logged out.', 'success')
+    return redirect('/')  # Redirect to index page instead of login
+
+@app.route('/test-db')
+def test_db():
+    try:
+        conn = get_db()
+        if not conn:
+            return "Database connection failed"
+        
+        cursor = conn.cursor()
+        
+        # Check if tables exist
+        cursor.execute("SHOW TABLES")
+        tables = cursor.fetchall()
+        
+        # Get table structures
+        table_info = {}
+        for table in tables:
+            table_name = table['Tables_in_swabhoomi']
+            cursor.execute(f"DESCRIBE {table_name}")
+            table_info[table_name] = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        return render_template('test_db.html', tables=tables, table_info=table_info)
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 if __name__ == '__main__':
     app.run(debug=True)

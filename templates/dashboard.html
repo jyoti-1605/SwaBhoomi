@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard</title>
+
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+
+    .dashboard {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 250px;
+      background-color: #343a40;
+      color: white;
+      padding: 20px;
+    }
+
+    .sidebar h4 {
+      color: #fff;
+      margin-bottom: 30px;
+    }
+
+    .sidebar a {
+      color: #adb5bd;
+      display: block;
+      margin-bottom: 15px;
+      text-decoration: none;
+    }
+
+    .sidebar a:hover {
+      color: white;
+    }
+
+    .content {
+      flex-grow: 1;
+      padding: 30px;
+    }
+
+    .card + .card {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="dashboard">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h4>Land Dashboard</h4>
+    <a href="#">1. Register Your Land</a>
+    <a href="#">2. Verify Land</a>
+    <a href="#">3. Buy Land</a>
+    <a href="#">4. Current Land Price</a>
+    <a href="#">5. Your Listings</a>
+    <a href="#">6. Similar Lands Nearby</a>
+    <hr class="bg-secondary">
+    <a href="/logout" class="btn btn-outline-light btn-sm mt-2">Logout</a>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content">
+    <h2>Dashboard</h2>
+
+    {% if user %}
+      <div class="mb-4">
+        <h5>User Information</h5>
+        <ul>
+          <li><strong>Name:</strong> {{ user[1] }}</li>
+          <li><strong>Email:</strong> {{ user[2] }}</li>
+        </ul>
+      </div>
+    {% endif %}
+
+    <!-- Section: Register Land -->
+    <div class="card p-4">
+      <h5>1. Register Your Land</h5>
+      <p>Start the process to officially register your land with the system.</p>
+      <a href="#" class="btn btn-primary">Register Land</a>
+    </div>
+
+    <!-- Section: Verify Land -->
+    <div class="card p-4">
+      <h5>2. Verify Land</h5>
+      <p>Verify your documents and ensure your land is authenticated on our platform.</p>
+      <a href="#" class="btn btn-secondary">Verify Now</a>
+    </div>
+
+    <!-- Section: Buy Land -->
+    <div class="card p-4">
+      <h5>3. Buy Land</h5>
+      <p>Explore available land listings and make purchases directly.</p>
+      <a href="#" class="btn btn-success">Browse Land</a>
+    </div>
+
+    <!-- Section: Land Price Chart -->
+    <div class="card p-4">
+      <h5>4. Your Current Land Price</h5>
+      <p>Track the value of your property over time.</p>
+      <!-- Placeholder for Graph -->
+      <canvas id="priceChart" height="200"></canvas>
+    </div>
+
+    <!-- Section: Your Land Listings -->
+    <div class="card p-4">
+      <h5>5. Your Land Listings</h5>
+      <ul>
+        <li>Land 1 - 1200 sqft - $45,000</li>
+        <li>Land 2 - 950 sqft - $38,000</li>
+        <li>Land 3 - 1500 sqft - $60,000</li>
+      </ul>
+    </div>
+
+    <!-- Section: Similar Lands Nearby -->
+    <div class="card p-4">
+      <h5>6. Similar Lands Near You</h5>
+      <ul>
+        <li>Plot A - 1000 sqft - $42,000 - 2km away</li>
+        <li>Plot B - 1100 sqft - $48,000 - 1.5km away</li>
+        <li>Plot C - 1300 sqft - $55,000 - 3km away</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<!-- Chart.js (for Land Price Graph) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  const priceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+      datasets: [{
+        label: 'Land Price ($)',
+        data: [42000, 44000, 46000, 45500, 47000],
+        backgroundColor: 'rgba(33, 37, 41, 0.2)',
+        borderColor: 'rgba(33, 37, 41, 1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: false
+        }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

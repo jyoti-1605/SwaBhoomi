@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SwaBhoomi - Blockchain Land Registry</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <!-- Google Translate Script -->
@@ -34,18 +34,25 @@
     <header class="header">
         <nav class="nav-container">
             <div class="logo">
-                <img src="placeholder-logo.png" alt="SwaBhoomi Logo" class="logo-img">
+                <img src="{{ url_for('static', filename='sblg-removebg (1).png') }}" alt="SwaBhoomi Logo" class="logo-img">
                 <h1>SwaBhoomi</h1>
             </div>
             <div class="nav-links">
-                <a href="#dashboard">Dashboard</a>
-                <a href="#features">Features</a>
-                <a href="#why-choose-us">why choose us</a>
-                <a href="#track">Track Transactions</a>
-                <a href="#profile">Profile</a>
-                <div id="google_translate_element"></div>
-                <a href="#logout" class="logout-btn">Logout</a>
-                
+                {% if session.get('user_id') %}
+                    <a href="/dashboard">Dashboard</a>
+                    <a href="#features">Features</a>
+                    <a href="#why-choose-us">Why Choose Us</a>
+                    <a href="#track">Track Transactions</a>
+                    <a href="/profile">Profile</a>
+                    <div id="google_translate_element"></div>
+                    <a href="/logout" class="logout-btn">Logout</a>
+                {% else %}
+                    <a href="#features" onclick="return checkLogin()">Features</a>
+                    <a href="#why-choose-us">Why Choose Us</a>
+                    <div id="google_translate_element"></div>
+                    <a href="/login" class="login-btn">Login</a>
+                    <a href="/register" class="register-btn">Register</a>
+                {% endif %}
             </div>
             <div class="mobile-menu">
                 <i class="fas fa-bars"></i>
@@ -329,5 +336,15 @@
     </footer>
 
     <script src="script.js"></script>
+    <script>
+        function checkLogin() {
+            {% if not session.get('user_id') %}
+                alert('Please login to access this feature');
+                window.location.href = '/login';
+                return false;
+            {% endif %}
+            return true;
+        }
+    </script>
 </body>
 </html> 
